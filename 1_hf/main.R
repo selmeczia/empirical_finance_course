@@ -113,16 +113,6 @@ p_dens <- ggdensity(data$logreturn, fill = "steelblue3", add = "mean", rug = T)+
 # There are to many values around 0, while there are empty space under the normal distribution curve 
 # around 0.05. There are even returns at -0.2.
 
-########### Saving plots ########### 
-path <- paste0(getwd(), "/", "1_hf/plots")
-
-ggsave("mean.png", p1, path = path, width = 10, height = 7)
-ggsave("variance.png", p2, path = path, width = 10, height = 7)
-ggsave("skewness.png", p3, path = path, width = 10, height = 7)
-ggsave("kurtosis.png", p4, path = path, width = 10, height = 7)
-
-ggsave("qq.png", p_qq, path = path, width = 10, height = 7)
-ggsave("density.png", p_dens, path = path, width = 10, height = 7)
 
 
 ########### Alpha estimation ########### 
@@ -142,33 +132,77 @@ for (i in 1:nrow(probability)){
 probability[, log_x := log(x)]
 probability[, log_prob_x := log(prob_x)]
 
-lm(d = probability, log_x ~ log_prob_x)
-#lm(d = probability, log_prob_x ~ log_x)
+regression_output <- summary(lm(d = probability, log_prob_x ~ log_x))
+
+alpha_reg <- -regression_output$coefficients[2]
+
+writeLines(paste0("\n    The regression-estimated alpha is ", round(alpha_reg, 4), "\n"))
 
 
 
 ########### Hill estimation ########### 
 
+
+# Function
 hill_plotting <- function(sample_size, log_loss){
   
-  alpha_data <- data.table(values = as.numeric())
   
-  for (i in 1:sample_size){
+  alpha_data <- data.table(sample_size = c(2:sample_size))
+  alpha_data[,alpha := as.numeric()]
   
-  hill_data <- data.table(x_i = sort(log_loss))
-  
+  hill_data <- data.table(x_i = sort(log_loss, decreasing = T))
   hill_data <- na.omit(hill_data)
-  
-  limit <- as.numeric(hill_data[sample_size])
   hill_data[,ln_x_i_a := as.numeric()]
-  hill_data$ln_x_i_a <- log(hill_data$x_i/limit)
   
-  alpha_data[i,] <- sample_size / sum(hill_data[ln_x_i_a > 0,]$ln_x_i_a)
+  for (i in 2:sample_size){
+
+  limit <- as.numeric(hill_data[i]$x_i)
+  suppressWarnings({hill_data$ln_x_i_a <- log(hill_data$x_i/limit)})
+  
+  alpha_data$alpha[i-1] <- i / sum(hill_data[ln_x_i_a > 0,]$ln_x_i_a)
   
   }
   
+  alpha_data[,probability := sample_size / length(log_loss)]
+  return(alpha_data)
 }
 
 
-hill_plotting(50, data$losses)
+# Running the function
+alpha_output <- hill_plotting(50, data$losses)
+
+
+# Creating Hill plots
+p_hill_1 <- ggplot(d = alpha_output, aes(x = sample_size, y = alpha))+
+  labs(x = "Sample size", y = "Alpha")+
+  geom_line(color = "steelblue3", size = 1.3)+
+  theme_economist()+
+  theme(axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"))+
+  scale_color_economist()
+
+p_hill_2 <- ggplot(d = alpha_output, aes(x = probability, y = alpha))+
+  labs(x = "Probability", y = "Alpha")+
+  scale_x_continuous(labels = function(x) paste0(x*100, "%"))+
+  geom_line(color = "steelblue3", size = 1.3)+
+  theme_economist()+
+  theme(axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"))+
+  scale_color_economist()
+
+
+########### Saving plots ########### 
+path <- paste0(getwd(), "/", "1_hf/plots")
+
+ggsave("mean.png", p1, path = path, width = 10, height = 7)
+ggsave("variance.png", p2, path = path, width = 10, height = 7)
+ggsave("skewness.png", p3, path = path, width = 10, height = 7)
+ggsave("kurtosis.png", p4, path = path, width = 10, height = 7)
+
+ggsave("qq.png", p_qq, path = path, width = 10, height = 7)
+ggsave("density.png", p_dens, path = path, width = 10, height = 7)
+
+ggsave("hill_sample_size.png", p_hill_1, path = path, width = 10, height = 7)
+ggsave("hill_probability.png", p_hill_2, path = path, width = 10, height = 7)
+
 

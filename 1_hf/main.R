@@ -191,6 +191,7 @@ p_hill_2 <- ggplot(d = alpha_output, aes(x = probability, y = alpha))+
   scale_color_economist()
 
 
+
 ########### Saving plots ########### 
 path <- paste0(getwd(), "/", "1_hf/plots")
 

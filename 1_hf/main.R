@@ -5,6 +5,7 @@ library(e1071)
 library(stats)
 library(ggpubr)
 library(ggthemes)
+library(tsoutliers)
 
 
 ########### Data load ########### 
@@ -104,6 +105,11 @@ p_qq <- ggqqplot(data$logreturn, color = "steelblue3")+
 # logreturns are much higher.
 
 # Test 3
+jarque.bera.test(na.remove(data$logreturn))
+# We reject the null hypothesis that the data is normally distributed.
+
+
+# Test 4
 p_dens <- ggdensity(data$logreturn, fill = "steelblue3", add = "mean", rug = T)+
   stat_overlay_normal_density(color = "red", linetype = "dashed", size = 1.3)+
   theme_economist()+

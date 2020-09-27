@@ -152,6 +152,7 @@ writeLines(paste0("\n    The regression-estimated alpha is ", round(alpha_reg, 4
 # Function
 hill_plotting <- function(sample_size, log_loss){
   
+  if (sample_size <= 2) {stop("The sample size is too small! \n  Choose a larger sample size!")}
   
   alpha_data <- data.table(sample_size = c(2:sample_size))
   alpha_data[,alpha := as.numeric()]

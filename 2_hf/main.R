@@ -65,9 +65,10 @@ for (i in 1:m){
 likelihood[,arg := 1 + (xi * (max_value - mu) / sigma)]
 likelihood[,loglh := ( -log(sigma) - ((1 + (1 / xi) ) * log(arg) )- arg^(-1 / xi) )]
 
+
 sum_of_likelihood <- sum(likelihood$loglh)
 
-optimise()
+
 
 
 logl <- function(parameters)
@@ -80,3 +81,18 @@ result <- optim(pars, logl, control = c("fnscale" = -1))
 result
 
 optimize(logl, maximum = T, interval = c(0,1))
+
+##### EVT #####
+evt_table <- data.table(sorted_loss = as.numeric(data[order(-loss),]$loss))
+
+u <- 0.055
+evt_table[,Y := sorted_loss-u]
+
+Nu <- nrow(evt_table[evt_table$Y > 0])
+eps <- 0.303
+beta <- 0.02
+
+likelihood <- evt_table[1:Nu]
+likelihood[, lnL := -log(beta) - (1 + 1/eps) * log(1 + eps/beta*Y)]
+
+

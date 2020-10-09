@@ -7,6 +7,7 @@ library(ggpubr)
 library(ggthemes)
 library(tsoutliers)
 library(stats)
+library(openxlsx)
 
 ##feladatok:
 ## GPD eloszlás (generalized pareto distributoin)
@@ -35,64 +36,97 @@ data <- cbind(data, logreturn = c(NA,z))
 #loss
 data[,loss := -logreturn]
 
-#parameters
-T <- length(data$loss[!is.na(data$loss)])
-n <- 40
-m = ceiling(T/n)
-mu <- 0.1
-sigma <- 0.1
-xi <- 0.1
 
 
+########### EVT ###########
 
-likelihood <- data.table(window_number = 1:m)
-likelihood[,max_value := as.numeric()]
-likelihood[,arg := as.numeric()]
-
-for (i in 1:m){
-  
-  lower_bound <- (n*(i-1))+1 
-  
-  if((n*i) > T){
-    upper_bound <- T
-  } else {
-    upper_bound <- n*i
-  }
-  
-  likelihood[i]$max_value <- max(data$loss[(lower_bound+1):upper_bound])
-}
-
-likelihood[,arg := 1 + (xi * (max_value - mu) / sigma)]
-likelihood[,loglh := ( -log(sigma) - ((1 + (1 / xi) ) * log(arg) )- arg^(-1 / xi) )]
-
-
-sum_of_likelihood <- sum(likelihood$loglh)
-
-
-
-
-logl <- function(parameters)
-  {sum(( -log(parameters[1]) - ((1 + (1 / parameters[2]) ) * log(likelihood$arg) )- likelihood$arg^(-1 / parameters[2]) ))}
-
-
-pars <- c(0.000001, 0.0000005)
-result <- optim(pars, logl, control = c("fnscale" = -1))
-
-result
-
-optimize(logl, maximum = T, interval = c(0,1))
-
-##### EVT #####
 evt_table <- data.table(sorted_loss = as.numeric(data[order(-loss),]$loss))
 
 u <- 0.055
 evt_table[,Y := sorted_loss-u]
 
 Nu <- nrow(evt_table[evt_table$Y > 0])
-eps <- 0.303
-beta <- 0.02
+xi <- 0.30256155567236
+beta <- 0.0198265125479346
 
 likelihood <- evt_table[1:Nu]
-likelihood[, lnL := -log(beta) - (1 + 1/eps) * log(1 + eps/beta*Y)]
+likelihood[, lnL := -log(beta) - (1 + 1/xi) * log(1 + xi/beta*Y)]
+
+logl <- function(parameters)
+{sum( -log(parameters[1]) - (1 + (1 / parameters[2]) ) * log(1 + parameters[2]/parameters[1]*likelihood$Y))}
 
 
+pars <- c(0.5, 0.5)
+result <- optim(pars, logl, control = c("fnscale" = -1))
+
+beta_hat <- result$par[1]
+xi_hat <- result$par[2]
+
+writeLines(paste0("\n xi : ", format(result$par[2], digit = 4),
+                  "\n Beta : ", format(result$par[1],digit = 4), "\n"))
+
+#write.xlsx(likelihood, "loss_sorted.xlsx")
+
+
+########### VaR and CVaR ###########
+
+n <- length(data$logreturn)-1
+q <- 0.99
+
+
+## EVT VaR
+
+EVT_VaR <- (u + beta_hat/xi_hat * ((n/Nu * (1-q))^(-xi_hat) - 1 ))
+writeLines(paste0("\n VaR at ", q*100, "% confidence level: ", format(EVT_VaR*100, digit = 3), "% \n"))
+
+
+## Historical VaR
+
+n_hist <- n*(1-q)
+VaR_hist <- likelihood$sorted_loss[ceiling(n_hist)]
+writeLines(paste0("\n Historical VaR at ", q*100, "% confidence level: ",
+                  format(VaR_hist*100, digit = 3), "% \n"))
+
+
+## EVT CVaR
+EVT_CVaR <- EVT_VaR + (beta_hat + xi_hat * (EVT_VaR-u)) / (1 - xi_hat)
+writeLines(paste0("\n EVT CVaR at ", q*100, "% confidence level: ",
+                  format(EVT_CVaR*100, digit = 3), "% \n"))
+
+
+## Historical CVaR
+CVaR_hist <- mean(likelihood[1:ceiling(n_hist)]$sorted_loss)
+writeLines(paste0("\n Historical CVaR at ", q*100, "% confidence level: ",
+                  format(CVaR_hist*100, digit = 3), "% \n"))
+
+
+
+########### Hill-method ########### 
+
+hill_data <- na.omit(data.table(sorted_loss = data[order(-loss),]$loss))
+hill_data[,excess := sorted_loss-u]
+A <- tail(hill_data[hill_data$sorted_loss > u]$sorted_loss, n = 1)
+hill_data[,lnL := log(sorted_loss/A)]
+
+alpha <- length(hill_data[hill_data$lnL >= 0]$lnL) / sum(hill_data[hill_data$lnL >= 0]$lnL)
+hill_xi <- 1/alpha
+hill_beta <-   mean(hill_data[hill_data$excess >= 0]$excess) * (1 - hill_xi)
+
+
+########### Peaks over Treshold ###########
+
+temp <- data.table(sorted_loss = as.numeric(data[order(-loss),]$loss))
+
+pot <- data.table(sorted_loss = as.numeric(temp[temp$sorted_loss > 0]$sorted_loss))
+pot[,peaks := as.numeric()]
+
+for (i in 2:nrow(pot)){
+  pot[i,]$peaks <- sum(pot[1:i]$sorted_loss - pot[i,]$sorted_loss) / (i-1)
+}
+
+
+plot_data <- pot$sorted_loss[3:336]
+plot_data_2 <- pot$peaks[3:336]
+
+  
+  

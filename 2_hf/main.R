@@ -8,6 +8,7 @@ library(ggthemes)
 library(tsoutliers)
 library(stats)
 library(openxlsx)
+library(evir)
 
 ##feladatok:
 ## GPD eloszlás (generalized pareto distributoin)
@@ -35,6 +36,32 @@ data <- cbind(data, logreturn = c(NA,z))
 
 #loss
 data[,loss := -logreturn]
+
+
+
+########### Peaks over Threshold ###########
+
+temp <- data.table(sorted_loss = as.numeric(data[order(-loss),]$loss))
+
+#only positive values
+pot <- data.table(sorted_loss = as.numeric(temp[temp$sorted_loss > 0]$sorted_loss))
+pot[,peaks := as.numeric()]
+
+#calculating average peaks over threshold
+for (i in 2:nrow(pot)){
+  pot[i,]$peaks <- sum(pot[1:i]$sorted_loss - pot[i,]$sorted_loss) / (i-1)
+}
+
+
+#plot_data <- pot$sorted_loss[3:336]
+#plot_data_2 <- pot$peaks[3:336]
+
+
+meplot(pot$sorted_loss)
+gdp_function <- gpd(pot$sorted_loss, threshold = 0.06)
+
+plot(gdp_function)
+
 
 
 
@@ -112,21 +139,8 @@ alpha <- length(hill_data[hill_data$lnL >= 0]$lnL) / sum(hill_data[hill_data$lnL
 hill_xi <- 1/alpha
 hill_beta <-   mean(hill_data[hill_data$excess >= 0]$excess) * (1 - hill_xi)
 
-
-########### Peaks over Treshold ###########
-
-temp <- data.table(sorted_loss = as.numeric(data[order(-loss),]$loss))
-
-pot <- data.table(sorted_loss = as.numeric(temp[temp$sorted_loss > 0]$sorted_loss))
-pot[,peaks := as.numeric()]
-
-for (i in 2:nrow(pot)){
-  pot[i,]$peaks <- sum(pot[1:i]$sorted_loss - pot[i,]$sorted_loss) / (i-1)
-}
+hill_xi
+hill_beta
 
 
-plot_data <- pot$sorted_loss[3:336]
-plot_data_2 <- pot$peaks[3:336]
-
-  
   

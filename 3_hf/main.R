@@ -2,7 +2,12 @@
 library(readxl)
 library(estudy2)
 library(data.table)
+library(ggplot2)
+library(ggthemes)
 
+# load functions
+funs_path <- paste0(getwd(), "/3_hf/functions.R")
+source(funs_path)
 
 #import files
 barc <- read.csv(paste0(getwd(), "/3_hf/data/barc.csv"))
@@ -34,89 +39,46 @@ proc_rds <- process_data(rds)
 
 # event study
 
-eventstudy(proc_barc, proc_index, "Barclays", "MSCI", "2016-06-22")
-eventstudy(proc_bat, proc_index, "Bat", "MSCI", "2016-06-22")
-eventstudy(proc_bp, proc_index, "Bp", "MSCI", "2016-06-22")
-eventstudy(proc_ezj, proc_index, "Easy_jet", "MSCI", "2016-06-22")
-eventstudy(proc_hsbc, proc_index, "Hsbc", "MSCI", "2016-06-22")
-eventstudy(proc_rbs, proc_index, "Rbs", "MSCI", "2016-06-22")
-eventstudy(proc_rds, proc_index, "Rds", "MSCI", "2016-06-22")
+e_barc <- eventstudy(proc_barc, proc_index, "Barclays", "MSCI", "2016-06-22")
+e_bat <- eventstudy(proc_bat, proc_index, "Bat", "MSCI", "2016-06-22")
+e_bp <- eventstudy(proc_bp, proc_index, "Bp", "MSCI", "2016-06-22")
+e_ezj <- eventstudy(proc_ezj, proc_index, "Easy_jet", "MSCI", "2016-06-22")
+e_hsbc <- eventstudy(proc_hsbc, proc_index, "Hsbc", "MSCI", "2016-06-22")
+e_rbs <- eventstudy(proc_rbs, proc_index, "Rbs", "MSCI", "2016-06-22")
+e_rds <- eventstudy(proc_rds, proc_index, "Rds", "MSCI", "2016-06-22")
 
 
+# abnormal returns
 
-### functions
+data <- data.table( days = 1:6, e_ezj$event)
 
-process_data <- function(data, index = F){
+ggplot(data = data, aes(x = days, y = e_star))+
+  geom_bar(stat = "identity", fill = "steelblue3")+
+  labs(x = "Days after event", y = "Abnormal return")+
+  scale_y_continuous(labels = function(x) paste0(x*100, "%"))+
+  theme_economist()
 
-  rest <- names(data[2:ncol(data)])
-  names(data) <- c("Date", rest)
-  n <- nrow(data)
-  
-  data$Return <- c(data[1:nrow(data)-1 , "Close"] /data[2:nrow(data), "Close"] - 1, NA)
-  
-  data$Date <- as.Date(data$Date, "%d-%b-%y")
-  processed_data <- data.table(data)
-  processed_data <- processed_data[Date >= "2015-06-22" & Date <= "2016-06-30" ,c("Date", "Return")]
-  
-  
-  
-  return(processed_data)
-}
+ggplot(data = data, aes(x = days, y = CAR))+
+  geom_line(color = "steelblue3", size = 3)+
+  scale_y_continuous(labels = function(x) paste0(x*100, "%"))+
+  theme_economist()
 
+# mean abnormal returns
 
+all_ret <- merge(proc_barc, proc_bat, by ="Date")
+all_ret <- merge(all_ret, proc_bp, by = "Date")
+names(all_ret) <- c("Date", "Barclays", "Bat", "Bp")
+all_ret <- merge(all_ret, proc_ezj, by = "Date")
+all_ret <- merge(all_ret, proc_hsbc, by = "Date")
+names(all_ret) <- c("Date", "Barclays", "Bat", "Bp", "Easy_jet", "Hsbc")
+all_ret <- merge(all_ret, proc_rbs, by = "Date")
+all_ret <- merge(all_ret, proc_rds, by = "Date")
+names(all_ret) <- c("Date", "Barclays", "Bat", "Bp", "Easy_jet", "Hsbc", "Rbs", "Rds")
+all_ret[,mean := rowMeans(all_ret[,2:7])]
 
-eventstudy <- function(data, index_data, y_col, x_col, event_start){
-  
-  merged <- merge(data, index_data, by = "Date")
-  names(merged) <- c("Date", y_col, x_col)
-  
-  
-  event_length <- nrow(merged[Date > event_start])
-  window <- merged[2:(nrow(merged)-event_length)]
-  event <- merged[(nrow(merged)+1-event_length):nrow(merged)]
-  
-  formula <- as.formula(paste0(y_col, "~", x_col) )
-  
-  result <- lm(formula, d = merged )
-  alpha <- result$coefficients[1]
-  beta <- result$coefficients[2]
-  
-  window$e_hat <- window[,..y_col]-alpha-beta*window[, ..x_col]
-  event$e_star <- event[,..y_col]-alpha-beta*event[,..x_col]
-  event$CAR <- cumsum(event$e_star)
-  
-  
-  sigma_sq_e_hat <- sum(window$e_hat[1:nrow(window)]^2) / (length(window$e_hat[1:nrow(window)])-2)
-  
-  
-  X_star <- matrix(1, nrow = event_length, ncol = 2)
-  X_star[,2] <- event$e_star
-  X <- matrix(1, nrow = nrow(window), ncol = 2)
-  
-  X[,2] <- window[1:nrow(window), ..x_col]$MSCI
-  
-  Vi <- diag(rep(sigma_sq_e_hat, event_length)) + X_star %*% solve(crossprod(X)) %*% t(X_star) * sigma_sq_e_hat
-  
-  var <- c()
-  for (i in 1:event_length) {
-    var[i] <- sum(Vi[1:i,1:i])
-  }
-  
-  event$VAR <- var
-  event$SCAR <- event$CAR/sqrt(event$VAR)
-  event$p_value <- 1-pt(abs(event$SCAR), df = nrow(window))
-  
-  output <- list()
-  output$e_hat <- window$e_hat
-  output$event <- event
-  output$alpha <- alpha
-  output$beta <- beta
-  output$sigma_sq_e_hat <- sigma_sq_e_hat
-  
-  return(output)
-}
-
-
+mean_ret <- all_ret[, c("Date", "mean")]
+names(mean_ret) <- c("Date", "return")
+eventstudy(mean_ret, proc_index, "All", "MSCI", "2016-06-22")
 
 
 

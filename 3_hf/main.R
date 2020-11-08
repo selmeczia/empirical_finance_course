@@ -5,19 +5,22 @@ library(data.table)
 library(ggplot2)
 library(ggthemes)
 
+# set working directory to the folder containing the functions.R and /data/ folder 
+# setwd(paste0(getwd(), "/3_hf/"))
+
 # load functions
-funs_path <- paste0(getwd(), "/3_hf/functions.R")
+funs_path <- paste0(getwd(), "functions.R")
 source(funs_path)
 
 #import files
-barc <- read.csv(paste0(getwd(), "/3_hf/data/barc.csv"))
-bat <- read.csv(paste0(getwd(), "/3_hf/data/bat.csv"))
-bp <- read.csv(paste0(getwd(), "/3_hf/data/bp.csv"))
-ezj <- read.csv(paste0(getwd(), "/3_hf/data/ezj.csv"))
-hsbc <- read.csv(paste0(getwd(), "/3_hf/data/hsbc.csv"))
-rbs <- read.csv(paste0(getwd(), "/3_hf/data/rbs.csv"))
-rds <- read.csv(paste0(getwd(), "/3_hf/data/rds.csv"))
-index <- read_excel(paste0(getwd(), "/3_hf/data/historyIndex.xls"))
+barc <- read.csv(paste0(getwd(), "data/barc.csv"))
+bat <- read.csv(paste0(getwd(), "data/bat.csv"))
+bp <- read.csv(paste0(getwd(), "data/bp.csv"))
+ezj <- read.csv(paste0(getwd(), "data/ezj.csv"))
+hsbc <- read.csv(paste0(getwd(), "data/hsbc.csv"))
+rbs <- read.csv(paste0(getwd(), "data/rbs.csv"))
+rds <- read.csv(paste0(getwd(), "data/rds.csv"))
+index <- read_excel(paste0(getwd(), "data/historyIndex.xls"))
 names(index) <- c("Date", "standard_index")
 
 # create index data table

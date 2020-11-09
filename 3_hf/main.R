@@ -4,6 +4,7 @@ library(estudy2)
 library(data.table)
 library(ggplot2)
 library(ggthemes)
+library(dplyr)
 
 # set working directory to the folder containing the functions.R and /data/ folder 
 # setwd(paste0(getwd(), "/3_hf/"))
@@ -51,7 +52,17 @@ e_rbs <- eventstudy(proc_rbs, proc_index, "Rbs", "MSCI", "2016-06-22")
 e_rds <- eventstudy(proc_rds, proc_index, "Rds", "MSCI", "2016-06-22")
 
 
+
 # abnormal returns
+
+e_barc$event
+e_bat$event
+e_bp$event
+e_ezj$event
+e_hsbc$event
+e_rbs$event
+e_rds$event
+#write.csv(e_rds$event, file = "temp.csv", row.names=FALSE)
 
 data <- data.table( days = 1:6, e_ezj$event)
 
@@ -81,9 +92,9 @@ all_ret[,mean := rowMeans(all_ret[,2:7])]
 
 mean_ret <- all_ret[, c("Date", "mean")]
 names(mean_ret) <- c("Date", "return")
-eventstudy(mean_ret, proc_index, "All", "MSCI", "2016-06-22")
-
-
+e_all <- eventstudy(mean_ret, proc_index, "All", "MSCI", "2016-06-22")
+e_all$event
+#write.csv(e_all$event, file = "temp.csv", row.names=FALSE)
 
 
 
